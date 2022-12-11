@@ -1,13 +1,11 @@
 [package]
-name = "node-template-runtime"
-version = "4.0.0-dev"
-description = "A fresh FRAME-based Substrate node, ready for hacking."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io/"
+name = "node-simple-oracle-runtime"
+version = "0.0.0-alpha.0"
+description = "Non Fungible Labs Assignment"
+authors = ["cyphersnake <cyphersnake@pm.me>"]
 edition = "2021"
-license = "Unlicense"
 publish = false
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
+repository = "https://github.com/cyphersnake/non_fungible_labs_assignment.git"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -15,7 +13,6 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = ["derive"] }
 scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
-
 pallet-aura = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 pallet-balances = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
@@ -39,7 +36,6 @@ sp-std = { version = "4.0.0", default-features = false, git = "https://github.co
 sp-transaction-pool = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 sp-version = { version = "5.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
-# Used for the node template's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
@@ -48,7 +44,7 @@ frame-benchmarking = { version = "4.0.0-dev", default-features = false, git = "h
 frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", optional = true , branch = "polkadot-v0.9.32" }
 
 # Local Dependencies
-pallet-template = { version = "4.0.0-dev", default-features = false, path = "../pallets/template" }
+pallet-simple-oracle = { version = "0.0.0-alpha.0", default-features = false, path = "../pallets/simple_oracle" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
@@ -71,7 +67,7 @@ std = [
 	"pallet-grandpa/std",
 	"pallet-randomness-collective-flip/std",
 	"pallet-sudo/std",
-	"pallet-template/std",
+	"pallet-simple-oracle/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
@@ -94,7 +90,7 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
-	"pallet-template/runtime-benchmarks",
+	"pallet-simple-oracle/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
@@ -108,7 +104,7 @@ try-runtime = [
 	"pallet-grandpa/try-runtime",
 	"pallet-randomness-collective-flip/try-runtime",
 	"pallet-sudo/try-runtime",
-	"pallet-template/try-runtime",
+	"pallet-simple-oracle/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 ]

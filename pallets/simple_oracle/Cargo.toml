@@ -1,13 +1,12 @@
 [package]
-name = "pallet-template"
-version = "4.0.0-dev"
-description = "FRAME pallet template for defining custom runtime logic."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io"
+name = "pallet-simple-oracle"
+version = "0.0.0-alpha.0"
+description = "Non Fungible Labs Assignment"
+authors = ["cyphersnake <cyphersnake@pm.me>"]
 edition = "2021"
 license = "Unlicense"
 publish = false
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
+repository = "https://github.com/cyphersnake/non_fungible_labs_assignment.git"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
