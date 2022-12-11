@@ -173,6 +173,10 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Storage for events that have been pushed to this oracle.
 		/// Stores events for the last hour as required.
+        ///
+        /// Because there were no additional conditions on the data
+        /// access format, we give access only to the data itself
+        /// in chronological order.
 		pub fn oracle_data() -> Option<Vec<oracle_data::Data>> {
 			Some(
 				<EventsStorage<T> as frame_support::storage::StorageValue<
