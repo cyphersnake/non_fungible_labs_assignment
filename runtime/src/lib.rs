@@ -276,7 +276,14 @@ impl pallet_sudo::Config for Runtime {
 pub struct DefaultOracleAuthority {}
 impl Get<AccountId> for DefaultOracleAuthority {
 	fn get() -> AccountId {
-		todo!()
+		// TODO
+		// Alice key is simply inserted here, which will be used
+		// for the demonstration. Ultimately, here I would like
+		// to have an externally configurable parameter
+		AccountId::new([
+			212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133,
+			88, 133, 76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125,
+		])
 	}
 }
 
@@ -284,7 +291,7 @@ impl Get<AccountId> for DefaultOracleAuthority {
 impl pallet_simple_oracle::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type DefaultOracleAuthority = DefaultOracleAuthority;
-	type OracleDataLifetime = ConstU64<3600>;
+	type OracleDataLifetime = ConstU64<3_600_000>;
 	type WeightInfo = ();
 }
 
