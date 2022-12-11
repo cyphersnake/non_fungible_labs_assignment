@@ -1,3 +1,18 @@
+# Non Fungible Labs Assignment
+
+Write a simple pallet for an oracle event feed
+- An event is arbitrary length bytes
+- Only a single authorised account may post an event
+- The pallet should store the last 1 hour of events
+- Notes down any known security issues, or things to be improved if you are running out of time
+
+Requirements:
+- Codebase must be published on GitHub as a private repo, and please invite me (`ken-centrality`) to it once complete.
+- Codebase must be compiled without any issues
+- Codebase should have tests to demonstrate the functionality
+
+Let me know if you have any questions.
+
 # Substrate Node Template
 
 [![Try on playground](https://img.shields.io/badge/Playground-Node_Template-brightgreen?logo=Parity%20Substrate)](https://docs.substrate.io/playground/) [![Matrix](https://img.shields.io/matrix/substrate-technical:matrix.org)](https://matrix.to/#/#substrate-technical:matrix.org)
