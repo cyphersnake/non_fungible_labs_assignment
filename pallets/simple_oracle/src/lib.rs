@@ -1,8 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
 #[cfg(test)]
@@ -11,91 +8,257 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
+// Module defining storage structures for oracle data
+pub mod oracle_data {
+	use core::ops::Sub;
+	use sp_std::vec::Vec;
+
+	use frame_support::pallet_prelude::{Decode, Encode, Get, RuntimeDebug};
+	use scale_info::TypeInfo;
+
+	pub type Data = Vec<u8>;
+
+	#[derive(RuntimeDebug, Encode, Decode, Default, Clone, PartialEq, TypeInfo)]
+	pub struct OracleData<MOMENT> {
+		data: Data,
+		saved_at: MOMENT,
+	}
+
+	impl<MOMENT: PartialOrd> PartialOrd for OracleData<MOMENT> {
+		fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+			self.saved_at.partial_cmp(&other.saved_at)
+		}
+	}
+
+	#[derive(RuntimeDebug, Encode, Decode, Clone, PartialEq, TypeInfo, Default)]
+	pub struct OracleStorage<MOMENT>(Vec<OracleData<MOMENT>>);
+
+	#[derive(Debug, PartialEq, Eq)]
+	pub enum Error {
+		/// An attempt was made to insert outdated data
+		///
+		/// For simplicity, you can only add data to a storage
+		/// if there is no newer data in it.
+		AttemptToInsertHistoricalData,
+	}
+
+	impl<MOMENT: Sub<MOMENT> + Copy + Ord> OracleStorage<MOMENT>
+	where
+		<MOMENT as Sub>::Output: PartialOrd<MOMENT>,
+	{
+		pub fn iter_data<LIFETIME>(&self, now: MOMENT) -> impl Iterator<Item = &[u8]>
+		where
+			LIFETIME: Get<MOMENT>,
+		{
+			self.0
+				.iter()
+				.skip_while(move |oracle_data| now.sub(oracle_data.saved_at).ge(&LIFETIME::get()))
+				.map(|oracle_data| oracle_data.data.as_slice())
+		}
+
+		/// Delete data from storage if it's alive longer than LIFETIME
+		pub fn clean_outdated_data<LIFETIME>(&mut self, now: MOMENT) -> Result<(), Error>
+		where
+			LIFETIME: Get<MOMENT>,
+		{
+			if matches!(self.0.last(), Some(OracleData { saved_at, .. }) if saved_at > &now) {
+				return Err(Error::AttemptToInsertHistoricalData)
+			}
+
+			let point = self.0.partition_point(|data| now.sub(data.saved_at).ge(&LIFETIME::get()));
+			self.0.drain(..point);
+
+			Ok(())
+		}
+		/// Push new data to storage & clean outdated data
+		pub fn push<LIFETIME>(&mut self, now: MOMENT, data: Data) -> Result<(), Error>
+		where
+			LIFETIME: Get<MOMENT>,
+		{
+			// This call will also check that `now` is not obsolete
+			self.clean_outdated_data::<LIFETIME>(now)?;
+			self.0.push(OracleData { data, saved_at: now });
+
+			Ok(())
+		}
+	}
+
+	#[cfg(test)]
+	mod oracle_data_test {
+		use super::OracleData;
+		use sp_core::ConstU64;
+
+		type OracleStorage = super::OracleStorage<u64>;
+
+		#[test]
+		fn test_normal_push() {
+			let mut storage = OracleStorage::default();
+			storage.push::<ConstU64<10>>(0, b"0".to_vec()).unwrap();
+			storage.push::<ConstU64<10>>(1, b"1".to_vec()).unwrap();
+			storage.push::<ConstU64<10>>(2, b"2".to_vec()).unwrap();
+
+			assert_eq!(
+				storage.0.as_slice(),
+				[
+					OracleData { saved_at: 0, data: b"0".to_vec() },
+					OracleData { saved_at: 1, data: b"1".to_vec() },
+					OracleData { saved_at: 2, data: b"2".to_vec() }
+				]
+			);
+		}
+
+		#[test]
+		fn test_failed_insert() {
+			let mut storage = OracleStorage::default();
+			storage.push::<ConstU64<10>>(10, b"0".to_vec()).unwrap();
+			assert_eq!(
+				storage.push::<ConstU64<10>>(0, b"1".to_vec()).unwrap_err(),
+				super::Error::AttemptToInsertHistoricalData
+			);
+		}
+
+		#[test]
+		fn test_lifetime() {
+			let mut storage = OracleStorage::default();
+			storage.push::<ConstU64<10>>(0, b"0".to_vec()).unwrap();
+			storage.push::<ConstU64<10>>(10, b"10".to_vec()).unwrap();
+			assert_eq!(storage.0.as_slice(), [OracleData { saved_at: 10, data: b"10".to_vec() }]);
+
+			storage.push::<ConstU64<10>>(100, b"100".to_vec()).unwrap();
+			assert_eq!(storage.0.as_slice(), [OracleData { saved_at: 100, data: b"100".to_vec() }]);
+		}
+	}
+}
+
+pub mod weights {
+	use frame_support::weights::Weight;
+
+	/// Information about pallets pub methods weight
+	pub trait WeightInfo {
+		const PUSH_WEIGHT: Weight;
+		const CLEAN_OUTDATED_DATA_WEIGHT: Weight;
+	}
+
+	/// Arbitrary defaults
+	impl WeightInfo for () {
+		const CLEAN_OUTDATED_DATA_WEIGHT: Weight = Weight::from_ref_time(10_000);
+		const PUSH_WEIGHT: Weight = Weight::from_ref_time(10_000);
+	}
+}
 
 #[frame_support::pallet]
 pub mod pallet {
+	use sp_std::vec::Vec;
+
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
-	pub struct Pallet<T>(_);
+	use super::{oracle_data, weights::WeightInfo};
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+	pub trait Config: frame_system::Config + pallet_timestamp::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+		type DefaultOracleAuthority: Get<Self::AccountId>;
+		type OracleDataLifetime: Get<<Self as pallet_timestamp::Config>::Moment>;
+		type WeightInfo: WeightInfo;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
+	/// Storage for events that have been pushed to this oracle.
+	/// Stores events for the last hour as required.
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	pub type EventsStorage<T: Config> =
+		StorageValue<_, oracle_data::OracleStorage<<T as pallet_timestamp::Config>::Moment>>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+	impl<T: Config> Pallet<T> {
+		/// Storage for events that have been pushed to this oracle.
+		/// Stores events for the last hour as required.
+        ///
+        /// Because there were no additional conditions on the data
+        /// access format, we give access only to the data itself
+        /// in chronological order.
+		pub fn oracle_data() -> Option<Vec<oracle_data::Data>> {
+			Some(
+				<EventsStorage<T> as frame_support::storage::StorageValue<
+					oracle_data::OracleStorage<<T as pallet_timestamp::Config>::Moment>,
+				>>::get()?
+				.iter_data::<<T as Config>::OracleDataLifetime>(<pallet_timestamp::Pallet<T>>::get())
+				.map(|data| data.to_vec())
+				.collect(),
+			)
+		}
+	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored { something: u32, who: T::AccountId },
+		Emitted { data: oracle_data::Data },
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		WrongAuthority,
+		AttemptToInsertHistoricalData,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+	impl<T> From<oracle_data::Error> for Error<T> {
+		fn from(item: oracle_data::Error) -> Self {
+			match item {
+				oracle_data::Error::AttemptToInsertHistoricalData =>
+					Self::AttemptToInsertHistoricalData,
+			}
+		}
+	}
+
+	/// Pallet Struct
+	///
+	/// Remove storage info, because pallet storage hasn't got stable size
+	#[pallet::pallet]
+	#[pallet::without_storage_info]
+	#[pallet::generate_store(pub(super) trait Store)]
+	pub struct Pallet<T>(_);
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
+		/// Clean outdated data from pallet's storage
+		///
+		/// Method call allowed for anyone
+		#[pallet::weight(<T as Config>::WeightInfo::CLEAN_OUTDATED_DATA_WEIGHT + T::DbWeight::get().reads_writes(1, 1))]
+		pub fn clean_outdated_data(_origin: OriginFor<T>) -> DispatchResult {
+			<EventsStorage<T>>::try_mutate(|storage| -> Result<(), Error<T>> {
+				storage
+					.get_or_insert_with(oracle_data::OracleStorage::default)
+					.clean_outdated_data::<<T as Config>::OracleDataLifetime>(
+					<pallet_timestamp::Pallet<T>>::get(),
+				)?;
+				Ok(())
+			})?;
 
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
-			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		/// Push oracle data
+		/// Method deposite [`Event::Emitted`] & store data to pallet storage
+		///
+		/// Method call allowed only for [`Config::DefaultOracleAuthority`]
+		#[pallet::weight(<T as Config>::WeightInfo::PUSH_WEIGHT + T::DbWeight::get().reads_writes(1, 1))]
+		pub fn push_data(origin: OriginFor<T>, data: oracle_data::Data) -> DispatchResult {
+			if ensure_signed(origin)?.eq(&<T as Config>::DefaultOracleAuthority::get()) {
+				Self::deposit_event(Event::Emitted { data: data.clone() });
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
+				<EventsStorage<T>>::try_mutate(|storage| -> Result<(), Error<T>> {
+					storage
+						.get_or_insert_with(oracle_data::OracleStorage::default)
+						.push::<<T as Config>::OracleDataLifetime>(
+						<pallet_timestamp::Pallet<T>>::get(),
+						data,
+					)?;
 					Ok(())
-				},
+				})?;
+
+				Ok(())
+			} else {
+				Err(Error::<T>::WrongAuthority.into())
 			}
 		}
 	}

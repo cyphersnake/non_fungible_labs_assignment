@@ -38,6 +38,11 @@ jobs:
         run: |
           SKIP_WASM_BUILD=1 cargo check --release
 
+      - name: Check Clippy
+        run: >
+          pushd node &&
+          cargo clippy --workspace -- -D warnings
+
       - name: Check Build for Benchmarking
         run: >
           pushd node &&

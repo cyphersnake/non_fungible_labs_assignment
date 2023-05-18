@@ -19,6 +19,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		SimpleOracleModule: pallet_simple_oracle,
+		Timestamp: pallet_timestamp,
 	}
 );
 
@@ -49,11 +50,28 @@ impl system::Config for Test {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+impl Test {
+	pub const DEFAULT_ORACLE_ACCOUNT_ID: u64 = 0;
+}
+
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = ConstU64<1>;
+	type WeightInfo = ();
+}
+
 impl pallet_simple_oracle::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type DefaultOracleAuthority = ConstU64<{ Self::DEFAULT_ORACLE_ACCOUNT_ID }>;
+	type OracleDataLifetime = ConstU64<3600>;
+	type WeightInfo = ();
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut ext = sp_io::TestExternalities::new(t);
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }
